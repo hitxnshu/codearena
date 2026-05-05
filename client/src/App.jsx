@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Home from './pages/Home';
+import Battle from './pages/Battle';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -25,6 +26,14 @@ const AppRoutes = () => {
         element={
           <PrivateRoute>
             <Home />
+          </PrivateRoute>
+        } 
+      />
+      <Route 
+        path="/battle/:id" 
+        element={
+          <PrivateRoute>
+            <Battle />
           </PrivateRoute>
         } 
       />

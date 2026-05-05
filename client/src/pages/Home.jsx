@@ -1,11 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Swords, Trophy, Activity } from 'lucide-react';
+import { LogOut, Swords, Trophy, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const Home = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [openBattles, setOpenBattles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetchOpenBattles();
+    // Refresh battle list every 5 seconds
+    const interval = setInterval(fetchOpenBattles, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchOpenBattles = async () => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/battles/open');
+      setOpenBattles(res.data);
+    } catch (err) {
+      console.error('Error fetching battles:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateBattle = async () => {
+    setCreating(true);
+    try {
+      const res = await axios.post('http://localhost:5000/api/battles/create');
+      navigate(`/battle/${res.data._id}`);
+    } catch (err) {
+      console.error('Error creating battle:', err);
+      alert('Failed to create battle');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleJoinBattle = async (battleId) => {
+    try {
+      const res = await axios.post(`http://localhost:5000/api/battles/join/${battleId}`);
+      navigate(`/battle/${res.data._id}`);
+    } catch (err) {
+      console.error('Error joining battle:', err);
+      if (err.response?.status === 400 && err.response.data.message === 'You are already in this battle') {
+        navigate(`/battle/${battleId}`);
+      } else {
+        alert(err.response?.data?.message || 'Failed to join battle');
+      }
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -29,7 +78,7 @@ const Home = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
         
         {/* Profile Stats Card */}
-        <div className="auth-card glass" style={{ padding: '2rem', width: 'auto', maxWidth: 'none' }}>
+        <div className="auth-card glass" style={{ padding: '2rem', width: 'auto', maxWidth: 'none', alignSelf: 'start' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
             <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '1rem', borderRadius: '50%' }}>
               <Trophy size={24} color="var(--primary)" />
@@ -58,21 +107,56 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Action Card */}
-        <div className="auth-card glass" style={{ padding: '2rem', width: 'auto', maxWidth: 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ background: 'rgba(16, 185, 129, 0.2)', padding: '1.5rem', borderRadius: '50%', marginBottom: '1.5rem' }}>
-            <Swords size={48} color="var(--success)" />
+        {/* Matchmaking Card */}
+        <div className="auth-card glass" style={{ padding: '2rem', width: 'auto', maxWidth: 'none' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Swords color="var(--success)" /> Open Battles
+            </h2>
+            <button 
+              onClick={handleCreateBattle} 
+              disabled={creating}
+              className="btn" 
+              style={{ background: 'var(--primary)', padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+            >
+              {creating ? <Loader2 size={16} className="spin" /> : 'Create Room'}
+            </button>
           </div>
-          <h2 style={{ marginBottom: '0.5rem' }}>Ready for battle?</h2>
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginBottom: '2rem' }}>
-            Join a room and prove your coding skills in real-time 1v1 matches.
-          </p>
-          <button className="btn" style={{ fontSize: '1.125rem', padding: '1rem 2rem', background: 'var(--success)', width: '100%' }}>
-            Find a Match
-          </button>
+
+          <div style={{ background: 'rgba(15, 23, 42, 0.5)', borderRadius: '8px', padding: '1rem', minHeight: '200px' }}>
+            {loading ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>Loading battles...</div>
+            ) : openBattles.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                No open battles right now. Create one to get started!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {openBattles.map((battle) => (
+                  <div key={battle._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(30, 41, 59, 0.8)', padding: '1rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                    <div>
+                      <div style={{ fontWeight: 'bold' }}>{battle.players[0]?.name}'s Room</div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Rating: {battle.players[0]?.rating}</div>
+                    </div>
+                    <button 
+                      onClick={() => handleJoinBattle(battle._id)}
+                      className="btn" 
+                      style={{ background: 'var(--success)', padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                    >
+                      Join
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
       </div>
+      <style>{`
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 };

@@ -28,6 +28,12 @@ app.get('/', (req, res) => {
   res.send('CodeArena API is running');
 });
 
-app.listen(PORT, () => {
+const http = require('http');
+const initializeSocket = require('./socket');
+
+const server = http.createServer(app);
+const io = initializeSocket(server);
+
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
