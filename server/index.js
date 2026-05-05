@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
+const battleRoutes = require('./routes/battles');
 
 const app = express();
 
@@ -21,6 +22,7 @@ mongoose.connect(MONGO_URI)
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/battles', battleRoutes);
 
 app.get('/', (req, res) => {
   res.send('CodeArena API is running');
