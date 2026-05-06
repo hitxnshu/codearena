@@ -31,6 +31,11 @@ function initializeSocket(server) {
       io.to(battleId).emit('battleStarted');
     });
 
+    // Handle code submission / winning
+    socket.on('submitCode', ({ battleId, user }) => {
+      io.to(battleId).emit('battleEnded', { winnerName: user.name });
+    });
+
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`);
     });

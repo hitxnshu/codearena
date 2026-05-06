@@ -23,6 +23,7 @@ mongoose.connect(MONGO_URI)
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/battles', battleRoutes);
+app.use('/api/execute', require('./routes/execute'));
 
 app.get('/', (req, res) => {
   res.send('CodeArena API is running');
