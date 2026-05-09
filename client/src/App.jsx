@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Home from './pages/Home';
@@ -19,15 +20,12 @@ const AppRoutes = () => {
   
   return (
     <Routes>
+      <Route path="/landing" element={<Landing />} />
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/signup" element={user ? <Navigate to="/" /> : <Signup />} />
       <Route 
         path="/" 
-        element={
-          <PrivateRoute>
-            <Home />
-          </PrivateRoute>
-        } 
+        element={user ? <PrivateRoute><Home /></PrivateRoute> : <Navigate to="/landing" />}
       />
       <Route 
         path="/battle/:id" 

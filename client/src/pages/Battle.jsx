@@ -3,9 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
-import { Users, Clock, Play, Loader2, CheckCircle, XCircle, Send, AlertTriangle } from 'lucide-react';
+import { Users, Clock, Play, Loader2, CheckCircle, XCircle, Send, AlertTriangle, Trophy } from 'lucide-react';
 import axios from 'axios';
 import confetti from 'canvas-confetti';
+import Navbar from '../components/Navbar';
+
+const BOILERPLATES = {
+  javascript: 'function twoSum(nums, target) {\n  // Write your solution here\n  \n}',
+  java: 'class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        // Write your solution here\n        return new int[]{0, 0};\n    }\n}',
+  cpp: 'class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        // Write your solution here\n        return {0, 0};\n    }\n};',
+  c: '/**\n * Note: The returned array must be malloced, assume caller calls free().\n */\nint* twoSum(int* nums, int numsSize, int target, int* returnSize) {\n    // Write your solution here\n    int* res = malloc(2 * sizeof(int));\n    res[0] = 0; res[1] = 0;\n    return res;\n}'
+};
 
 const Battle = () => {
   const { id: battleId } = useParams();
@@ -13,9 +21,10 @@ const Battle = () => {
   const navigate = useNavigate();
   
   const [socket, setSocket] = useState(null);
-  const [code, setCode] = useState('function twoSum(nums, target) {\n  // Write your solution here\n  \n}');
+  const [language, setLanguage] = useState('javascript');
+  const [code, setCode] = useState(BOILERPLATES['javascript']);
   const [opponent, setOpponent] = useState(null);
-  const [battleStatus, setBattleStatus] = useState('waiting'); // waiting, active, finished
+  const [battleStatus, setBattleStatus] = useState('waiting');
   const [timer, setTimer] = useState(0);
   const [loading, setLoading] = useState(true);
   
@@ -26,7 +35,6 @@ const Battle = () => {
   
   const editorRef = useRef(null);
 
-  // Initialize socket and fetch battle details
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -60,16 +68,11 @@ const Battle = () => {
       }
     });
 
-    const fetchBattle = async () => {
-      setLoading(false);
-    };
-    
-    fetchBattle();
+    setLoading(false);
 
     return () => newSocket.disconnect();
   }, [battleId, user, navigate]);
 
-  // Timer logic
   useEffect(() => {
     let interval;
     if (battleStatus === 'active') {
@@ -85,26 +88,17 @@ const Battle = () => {
     const end = Date.now() + duration;
 
     const frame = () => {
-      confetti({
-        particleCount: 5,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0 },
-        colors: ['#3b82f6', '#10b981']
-      });
-      confetti({
-        particleCount: 5,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1 },
-        colors: ['#3b82f6', '#10b981']
-      });
-
-      if (Date.now() < end) {
-        requestAnimationFrame(frame);
-      }
+      confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#3b82f6', '#10b981'] });
+      confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#3b82f6', '#10b981'] });
+      if (Date.now() < end) requestAnimationFrame(frame);
     };
     frame();
+  };
+
+  const handleLanguageChange = (e) => {
+    const newLang = e.target.value;
+    setLanguage(newLang);
+    setCode(BOILERPLATES[newLang]);
   };
 
   const handleEditorChange = (value) => {
@@ -114,7 +108,7 @@ const Battle = () => {
     }
   };
 
-  const handleEditorDidMount = (editor, monaco) => {
+  const handleEditorDidMount = (editor) => {
     editorRef.current = editor;
   };
 
@@ -124,249 +118,264 @@ const Battle = () => {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleRunCode = async () => {
+  const executeCode = async (isSubmit) => {
     if (battleStatus !== 'active') return;
-    setExecuting(true);
+    isSubmit ? setSubmitting(true) : setExecuting(true);
     setResults(null);
     
     try {
-      const res = await axios.post('http://localhost:5000/api/execute', { code, problemId: 'simple-two-sum' });
-      setResults({ ...res.data, isSubmit: false });
-    } catch (err) {
-      setResults({ error: err.response?.data?.message || 'Execution failed', isSubmit: false });
-    } finally {
-      setExecuting(false);
-    }
-  };
-
-  const handleSubmitCode = async () => {
-    if (battleStatus !== 'active') return;
-    setSubmitting(true);
-    setResults(null);
-    
-    try {
-      const res = await axios.post('http://localhost:5000/api/execute', { code, problemId: 'simple-two-sum' });
-      setResults({ ...res.data, isSubmit: true });
+      const res = await axios.post('http://localhost:5000/api/execute', { 
+        code, 
+        language, 
+        problemId: 'simple-two-sum' 
+      });
+      setResults({ ...res.data, isSubmit });
       
-      if (res.data.passedAll) {
+      if (isSubmit && res.data.passedAll) {
         socket.emit('submitCode', { battleId, user });
       }
     } catch (err) {
-      setResults({ error: err.response?.data?.message || 'Submission failed', isSubmit: true });
+      setResults({ error: err.response?.data?.message || 'Execution failed', isSubmit });
     } finally {
-      setSubmitting(false);
+      isSubmit ? setSubmitting(false) : setExecuting(false);
     }
   };
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white' }}><Loader2 className="spin" size={32} /></div>;
+    return <div className="page-loader"><Loader2 className="spin" size={36} /></div>;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-color)', position: 'relative' }}>
-      
-      {/* Victory Overlay Modal */}
+    <div className="battle-page">
+      <Navbar onAction={() => navigate('/')} />
+
       {battleStatus === 'finished' && (
-        <div style={{ 
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
-          background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(8px)',
-          zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          color: winner === user.name ? 'var(--success)' : 'var(--error)'
-        }}>
-          <div className="auth-card glass" style={{ textAlign: 'center', padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(30, 41, 59, 0.9)' }}>
-            {winner === user.name ? <Trophy size={80} style={{ marginBottom: '1rem' }} /> : <XCircle size={80} style={{ marginBottom: '1rem' }} />}
-            <h2 className={winner === user.name ? "win-animation" : ""} style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
-              {winner === user.name ? 'Victory!' : `${winner} Won!`}
-            </h2>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>The battle has ended. Your rating has been updated.</p>
-            <button className="btn" style={{ fontSize: '1.1rem', padding: '0.75rem 2rem' }} onClick={() => navigate('/')}>Return to Lobby</button>
+        <div className="overlay-panel">
+          <div className="finish-card glass">
+            {winner === user.name ? <Trophy size={80} /> : <XCircle size={80} />}
+            <h2>{winner === user.name ? 'Victory!' : `${winner} Won!`}</h2>
+            <p>The battle has ended. Your rating has been updated.</p>
+            <button className="btn" onClick={() => navigate('/')}>Return to Lobby</button>
           </div>
         </div>
       )}
 
-      {/* Header Panel */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', background: 'var(--bg-color-light)', borderBottom: '1px solid #334155' }}>
-        <h2 className="auth-title" style={{ margin: 0, fontSize: '1.5rem' }}>CodeArena Battle</h2>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Clock size={20} color={battleStatus === 'active' ? 'var(--success)' : 'var(--text-muted)'} />
-            <span style={{ fontSize: '1.25rem', fontWeight: 'bold', fontFamily: 'monospace' }}>
-              {formatTime(timer)}
-            </span>
+      <main className="battle-main">
+        <section className="battle-info glass">
+          <div>
+            <p className="eyebrow">Live Code Duel</p>
+            <h1>Battle {battleId.slice(-6).toUpperCase()}</h1>
+            <p>Opponent: {opponent?.name || 'Waiting for challenger...'}</p>
           </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(15, 23, 42, 0.5)', padding: '0.5rem 1rem', borderRadius: '8px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{user.name}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user.rating} ELO</div>
-            </div>
-            <span style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>VS</span>
+          <div className="battle-meta">
             <div>
-              <div style={{ fontWeight: 'bold', color: opponent ? 'var(--error)' : 'var(--text-muted)' }}>
-                {opponent ? opponent.name : 'Waiting...'}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {opponent ? `${opponent.rating} ELO` : '--'}
-              </div>
+              <span>Status</span>
+              <strong>{battleStatus}</strong>
             </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
-            className="btn" 
-            style={{ background: '#334155', color: 'white', gap: '0.5rem' }} 
-            onClick={handleRunCode}
-            disabled={executing || submitting || battleStatus !== 'active'}
-          >
-            {executing ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
-            {executing ? 'Running...' : 'Run Code'}
-          </button>
-          
-          <button 
-            className="btn" 
-            style={{ background: 'var(--success)', gap: '0.5rem' }} 
-            onClick={handleSubmitCode}
-            disabled={executing || submitting || battleStatus !== 'active'}
-          >
-            {submitting ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
-            {submitting ? 'Submitting...' : 'Submit'}
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', pointerEvents: battleStatus === 'finished' ? 'none' : 'auto' }}>
-        
-        {/* Problem Panel */}
-        <div style={{ width: '40%', padding: '1.5rem', overflowY: 'auto', borderRight: '1px solid #334155' }}>
-          {battleStatus === 'waiting' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', textAlign: 'center' }}>
-              <Loader2 className="spin" size={48} style={{ marginBottom: '1rem' }} />
-              <h3>Waiting for opponent...</h3>
-              <p>Wait for someone to join from the lobby.</p>
-            </div>
-          ) : (
             <div>
-              <h2 style={{ marginBottom: '1rem' }}>Two Sum</h2>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: 'var(--success)', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>Easy</span>
-              </div>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-                Given an array of integers <code>nums</code> and an integer <code>target</code>, return indices of the two numbers such that they add up to target.
-                You may assume that each input would have exactly one solution, and you may not use the same element twice.
-              </p>
-              
-              <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                <h4 style={{ marginBottom: '0.5rem' }}>Example 1:</h4>
-                <code style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--primary)' }}>Input: nums = [2,7,11,15], target = 9</code>
-                <code style={{ display: 'block', color: 'var(--success)' }}>Output: [0,1]</code>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Editor Panel */}
-        <div style={{ width: '60%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ flex: 1 }}>
-            <Editor
-              height="100%"
-              defaultLanguage="javascript"
-              theme="vs-dark"
-              value={code}
-              onChange={handleEditorChange}
-              onMount={handleEditorDidMount}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 16,
-                padding: { top: 16 },
-                readOnly: battleStatus !== 'active'
-              }}
-            />
-          </div>
-          {/* Console / Output Area */}
-          <div style={{ height: '35%', background: '#1e1e1e', borderTop: '1px solid #334155', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '0.5rem 1rem', background: '#2d2d2d', borderBottom: '1px solid #334155', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontWeight: 'bold', fontSize: '0.875rem' }}>
-              Test Results
-            </div>
-            
-            <div style={{ padding: '1rem', overflowY: 'auto', flex: 1 }}>
-              {battleStatus === 'waiting' && <div style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>Compiler will be ready when battle starts...</div>}
-              
-              {!results && battleStatus === 'active' && <div style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>You must run your code first.</div>}
-
-              {results && !results.error && !results.results?.some(r => r.error) && (
-                <div style={{ fontFamily: 'monospace' }}>
-                  <div style={{ marginBottom: '1rem', color: results.passedAll ? 'var(--success)' : 'var(--error)', fontSize: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {results.passedAll ? 'Accepted' : 'Wrong Answer'}
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                    {results.results.map((res, idx) => (
-                      <div key={idx} style={{ flex: '0 0 auto', width: '280px', padding: '1rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderTop: `4px solid ${res.passed ? 'var(--success)' : 'var(--error)'}` }}>
-                        <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          Test Case {res.testCase} {res.passed ? <CheckCircle size={16} color="var(--success)" /> : <XCircle size={16} color="var(--error)" />}
-                        </div>
-                        
-                        <div style={{ fontSize: '0.875rem' }}>
-                          <div style={{ color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Input:</div>
-                          <div style={{ marginBottom: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '4px' }}>{JSON.stringify(res.input)}</div>
-                          
-                          <div style={{ color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Expected Output:</div>
-                          <div style={{ marginBottom: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '4px' }}>{JSON.stringify(res.expected)}</div>
-                          
-                          <div style={{ color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Your Output:</div>
-                          <div style={{ color: res.passed ? 'var(--success)' : 'var(--error)', background: res.passed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', padding: '0.5rem', borderRadius: '4px' }}>
-                            {JSON.stringify(res.output)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(results?.error || results?.results?.some(r => r.error)) && (
-                <div style={{ fontFamily: 'monospace' }}>
-                  <div style={{ marginBottom: '1rem', color: 'var(--error)', fontSize: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <AlertTriangle size={20} /> {results?.error ? 'Execution Error' : 'Runtime / Syntax Error'}
-                  </div>
-                  <div style={{ color: 'var(--error)', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', whiteSpace: 'pre-wrap', fontSize: '1.1rem' }}>
-                    {results?.error || results?.results?.find(r => r.error)?.error}
-                  </div>
-                </div>
-              )}
+              <span>Timer</span>
+              <strong>{formatTime(timer)}</strong>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
+
+        <section className="editor-panel glass">
+          <div className="editor-toolbar">
+            <div className="editor-tabs">
+              <button className={language === 'javascript' ? 'active' : ''} onClick={() => setLanguage('javascript')}>JavaScript</button>
+              <button className={language === 'cpp' ? 'active' : ''} onClick={() => setLanguage('cpp')}>C++</button>
+              <button className={language === 'java' ? 'active' : ''} onClick={() => setLanguage('java')}>Java</button>
+              <button className={language === 'c' ? 'active' : ''} onClick={() => setLanguage('c')}>C</button>
+            </div>
+            <div className="editor-actions">
+              <button className="btn small-btn" onClick={() => executeCode(false)} disabled={!opponent || executing}>Run</button>
+              <button className="btn small-btn" onClick={() => executeCode(true)} disabled={!opponent || submitting}>Submit</button>
+            </div>
+          </div>
+
+          <Editor
+            height="520px"
+            language={language === 'c' || language === 'cpp' ? 'cpp' : language}
+            theme="vs-dark"
+            value={code}
+            onChange={handleEditorChange}
+            onMount={handleEditorDidMount}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 14,
+              lineNumbers: 'on',
+              readOnly: battleStatus !== 'active'
+            }}
+          />
+        </section>
+
+        <section className="results-panel glass">
+          <div className="results-header">
+            <h3>Battle Results</h3>
+            <span>{results?.isSubmit ? 'Submit' : 'Run'} output</span>
+          </div>
+          <div className="results-content">
+            {results ? (
+              results.error ? (
+                <div className="result-error">{results.error}</div>
+              ) : (
+                <pre>{JSON.stringify(results, null, 2)}</pre>
+              )
+            ) : (
+              <div className="result-empty">Execute code to see results.</div>
+            )}
+          </div>
+        </section>
+      </main>
+
       <style>{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        
-        .win-animation {
-          animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-          transform: scale(0);
+
+        .page-loader {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          color: white;
+          background: var(--bg-color);
         }
-        @keyframes pop {
-          to { transform: scale(1); }
+
+        .overlay-panel {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.85);
+          backdrop-filter: blur(10px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
         }
-        
-        /* Custom scrollbar for horizontal test cases */
-        ::-webkit-scrollbar {
-          height: 8px;
-          width: 8px;
+
+        .finish-card {
+          width: min(560px, calc(100% - 2rem));
+          padding: 2rem;
+          text-align: center;
+          border: 1px solid rgba(255,255,255,0.08);
+          box-shadow: 0 30px 60px rgba(0,0,0,0.35);
         }
-        ::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.2); 
+
+        .battle-main {
+          display: grid;
+          grid-template-columns: 320px 1.5fr 1fr;
+          gap: 1.5rem;
+          padding: 1.5rem;
         }
-        ::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1); 
-          border-radius: 4px;
+
+        .battle-info {
+          padding: 1.75rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          min-height: 440px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.2); 
+
+        .battle-info .eyebrow {
+          text-transform: uppercase;
+          letter-spacing: 0.16em;
+          color: var(--primary);
+          font-size: 0.85rem;
+          margin-bottom: 1rem;
+        }
+
+        .battle-info h1 {
+          margin: 0 0 1rem;
+          font-size: 2rem;
+          line-height: 1.1;
+        }
+
+        .battle-meta {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          margin-top: 2rem;
+          border-top: 1px solid rgba(255,255,255,0.08);
+          padding-top: 1.5rem;
+        }
+
+        .battle-meta div span {
+          display: block;
+          color: var(--text-muted);
+          margin-bottom: 0.5rem;
+        }
+
+        .editor-panel {
+          display: flex;
+          flex-direction: column;
+          min-height: 640px;
+          overflow: hidden;
+        }
+
+        .editor-toolbar {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          margin-bottom: 1rem;
+          flex-wrap: wrap;
+        }
+
+        .editor-tabs button {
+          border: none;
+          background: rgba(255,255,255,0.04);
+          color: white;
+          padding: 0.7rem 1rem;
+          border-radius: 999px;
+          margin-right: 0.5rem;
+          cursor: pointer;
+          transition: var(--transition);
+        }
+
+        .editor-tabs button.active,
+        .editor-tabs button:hover {
+          background: rgba(59,130,246,0.22);
+        }
+
+        .editor-actions {
+          display: flex;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+
+        .results-panel {
+          display: flex;
+          flex-direction: column;
+          min-height: 440px;
+          padding: 1.5rem;
+        }
+
+        .results-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+
+        .results-header h3 {
+          margin: 0;
+        }
+
+        .results-content {
+          flex: 1;
+          padding: 1rem;
+          background: rgba(15,23,42,0.55);
+          border-radius: 14px;
+          border: 1px solid rgba(255,255,255,0.08);
+          overflow: auto;
+          color: var(--text-muted);
+        }
+
+        .result-error {
+          color: var(--error);
+          white-space: pre-wrap;
+        }
+
+        .result-empty {
+          color: var(--text-muted);
         }
       `}</style>
     </div>

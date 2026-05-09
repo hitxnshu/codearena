@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Swords, Trophy, Loader2 } from 'lucide-react';
+import { Swords, Trophy, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Navbar from '../components/Navbar';
+
 
 const Home = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [openBattles, setOpenBattles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +15,6 @@ const Home = () => {
 
   useEffect(() => {
     fetchOpenBattles();
-    // Refresh battle list every 5 seconds
     const interval = setInterval(fetchOpenBattles, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -56,103 +57,99 @@ const Home = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   if (!user) return null;
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-        <h1 className="auth-title" style={{ margin: 0, textAlign: 'left' }}>CodeArena</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span>Welcome, <strong>{user.name}</strong></span>
-          <button onClick={handleLogout} className="btn" style={{ padding: '0.5rem 1rem', background: 'transparent', border: '1px solid #334155' }}>
-            <LogOut size={16} style={{ marginRight: '8px' }} /> Logout
-          </button>
-        </div>
-      </header>
+    <div className="home-page">
+      <Navbar onAction={handleCreateBattle} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
-        
-        {/* Profile Stats Card */}
-        <div className="auth-card glass" style={{ padding: '2rem', width: 'auto', maxWidth: 'none', alignSelf: 'start' }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
-            <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '1rem', borderRadius: '50%' }}>
-              <Trophy size={24} color="var(--primary)" />
+      <main className="home-main">
+        <section className="hero-panel glass">
+          <div className="hero-copy">
+            <span className="eyebrow">Play It The Way You Want</span>
+            <h1>Play, create and own your own gaming team anywhere, anytime.</h1>
+            <p>Jump into fast-paced coding battles, build your squad, and compete with challengers on a sleek pro platform.</p>
+            <div className="hero-actions">
+              <button className="btn hero-btn" onClick={handleCreateBattle} disabled={creating}>
+                {creating ? <Loader2 size={16} className="spin" /> : 'Go to Gaming World'}
+              </button>
+              <button className="text-btn" type="button" onClick={() => document.getElementById('battles-section')?.scrollIntoView({ behavior: 'smooth' })}>
+                Explore Teams
+              </button>
             </div>
-            <div>
-              <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Your Rating</h2>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary)' }}>
-                {user.rating} ELO
+          </div>
+
+          <div className="hero-visual">
+            <div className="hero-visual-card glass">
+              <div className="hero-visual-glow" />
+              <div className="hero-visual-graphic">
+                <div className="hero-visual-top" />
+                <div className="hero-visual-screen">
+                  <div className="screen-line" />
+                  <div className="screen-line short" />
+                  <div className="screen-chip" />
+                </div>
               </div>
             </div>
           </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #334155', paddingTop: '1.5rem' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Battles</div>
-              <div style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>{user.stats?.totalBattles || 0}</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Wins</div>
-              <div style={{ fontWeight: 'bold', fontSize: '1.25rem', color: 'var(--success)' }}>{user.stats?.wins || 0}</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Losses</div>
-              <div style={{ fontWeight: 'bold', fontSize: '1.25rem', color: 'var(--error)' }}>{user.stats?.losses || 0}</div>
-            </div>
-          </div>
-        </div>
+        </section>
 
-        {/* Matchmaking Card */}
-        <div className="auth-card glass" style={{ padding: '2rem', width: 'auto', maxWidth: 'none' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <Swords color="var(--success)" /> Open Battles
-            </h2>
-            <button 
-              onClick={handleCreateBattle} 
-              disabled={creating}
-              className="btn" 
-              style={{ background: 'var(--primary)', padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-            >
-              {creating ? <Loader2 size={16} className="spin" /> : 'Create Room'}
-            </button>
-          </div>
-
-          <div style={{ background: 'rgba(15, 23, 42, 0.5)', borderRadius: '8px', padding: '1rem', minHeight: '200px' }}>
-            {loading ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>Loading battles...</div>
-            ) : openBattles.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                No open battles right now. Create one to get started!
+        <section id="battles-section" className="battle-section">
+          <div className="battle-summary glass">
+            <div className="summary-head">
+              <h2>Welcome back, {user.name}</h2>
+              <p>Track your progress and jump into the next match.</p>
+            </div>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <span>Rating</span>
+                <strong>{user.rating} ELO</strong>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {openBattles.map((battle) => (
-                  <div key={battle._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(30, 41, 59, 0.8)', padding: '1rem', borderRadius: '8px', border: '1px solid #334155' }}>
+              <div className="stat-card">
+                <span>Battles</span>
+                <strong>{user.stats?.totalBattles || 0}</strong>
+              </div>
+              <div className="stat-card">
+                <span>Wins</span>
+                <strong>{user.stats?.wins || 0}</strong>
+              </div>
+              <div className="stat-card">
+                <span>Losses</span>
+                <strong>{user.stats?.losses || 0}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="battle-list glass">
+            <div className="list-header">
+              <h3>Open Battles</h3>
+              <button className="btn" onClick={handleCreateBattle} disabled={creating}>
+                {creating ? <Loader2 size={16} className="spin" /> : 'Create Room'}
+              </button>
+            </div>
+            <div className="battle-items">
+              {loading ? (
+                <div className="empty-state">Loading battles...</div>
+              ) : openBattles.length === 0 ? (
+                <div className="empty-state">No open battles right now. Create one to get started.</div>
+              ) : (
+                openBattles.map((battle) => (
+                  <div key={battle._id} className="battle-item">
                     <div>
-                      <div style={{ fontWeight: 'bold' }}>{battle.players[0]?.name}'s Room</div>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Rating: {battle.players[0]?.rating}</div>
+                      <p className="battle-owner">{battle.players[0]?.name}'s Room</p>
+                      <span>Rating: {battle.players[0]?.rating}</span>
                     </div>
-                    <button 
-                      onClick={() => handleJoinBattle(battle._id)}
-                      className="btn" 
-                      style={{ background: 'var(--success)', padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                    >
+                    <button className="btn small-btn" onClick={() => handleJoinBattle(battle._id)}>
                       Join
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        </section>
+      </main>
 
-      </div>
       <style>{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
