@@ -5,6 +5,7 @@ const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
 const battleRoutes = require('./routes/battles');
+const Battle = require('./models/Battle');
 
 const app = express();
 
@@ -17,7 +18,25 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/codearena';
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('MongoDB Connected'))
+  .then(async () => {
+    console.log('MongoDB Connected');
+    // Ensure no stale waiting rooms are visible by default after server start.
+    await Battle.deleteMany({ status: 'waiting' });
+    console.log('Cleared stale waiting battles on startup');
+
+    // Periodically clear stale waiting or finished battles.
+    setInterval(async () => {
+      try {
+        const staleWaiting = new Date(Date.now() - 5 * 60 * 1000);
+        const staleFinished = new Date(Date.now() - 60 * 60 * 1000);
+
+        await Battle.deleteMany({ status: 'waiting', updatedAt: { $lt: staleWaiting } });
+        await Battle.deleteMany({ status: 'finished', updatedAt: { $lt: staleFinished } });
+      } catch (err) {
+        console.error('Periodic battle cleanup error:', err);
+      }
+    }, 60 * 1000);
+  })
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes

@@ -76,4 +76,23 @@ router.get('/open', auth, async (req, res) => {
   }
 });
 
+// @route   GET api/battles/:id
+// @desc    Get battle details
+// @access  Private
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const battle = await Battle.findById(req.params.id).populate('players', 'name rating');
+    if (!battle) {
+      return res.status(404).json({ message: 'Battle not found' });
+    }
+    res.json(battle);
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ message: 'Battle not found' });
+    }
+    res.status(500).send('Server error');
+  }
+});
+
 module.exports = router;

@@ -27,6 +27,7 @@ const Battle = () => {
   const [battleStatus, setBattleStatus] = useState('waiting');
   const [timer, setTimer] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [roomError, setRoomError] = useState(null);
   
   const [executing, setExecuting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -41,8 +42,27 @@ const Battle = () => {
       return;
     }
 
+    let isMounted = true;
     const newSocket = io('http://localhost:5000');
     setSocket(newSocket);
+
+    const fetchBattle = async () => {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/battles/${battleId}`);
+        if (!isMounted) return;
+        if (res.data.status === 'finished') {
+          navigate('/');
+          return;
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        navigate('/');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchBattle();
 
     newSocket.on('connect', () => {
       newSocket.emit('joinRoom', { battleId, user });
@@ -68,9 +88,25 @@ const Battle = () => {
       }
     });
 
-    setLoading(false);
+    newSocket.on('opponentLeft', () => {
+      setRoomError('Opponent disconnected. Returning to lobby...');
+      setBattleStatus('finished');
+      setTimeout(() => navigate('/'), 2500);
+    });
 
-    return () => newSocket.disconnect();
+    newSocket.on('roomError', ({ message }) => {
+      setRoomError(message || 'Battle is unavailable. Redirecting...');
+      setBattleStatus('finished');
+      setTimeout(() => navigate('/'), 2500);
+    });
+
+    return () => {
+      isMounted = false;
+      if (newSocket.connected) {
+        newSocket.emit('leaveRoom', { battleId, user });
+        newSocket.disconnect();
+      }
+    };
   }, [battleId, user, navigate]);
 
   useEffect(() => {
@@ -149,12 +185,18 @@ const Battle = () => {
     <div className="battle-page">
       <Navbar onAction={() => navigate('/')} />
 
+      {roomError && (
+        <div className="battle-alert glass">
+          <p>{roomError}</p>
+        </div>
+      )}
+
       {battleStatus === 'finished' && (
         <div className="overlay-panel">
           <div className="finish-card glass">
-            {winner === user.name ? <Trophy size={80} /> : <XCircle size={80} />}
-            <h2>{winner === user.name ? 'Victory!' : `${winner} Won!`}</h2>
-            <p>The battle has ended. Your rating has been updated.</p>
+            {roomError ? <AlertTriangle size={80} /> : winner === user.name ? <Trophy size={80} /> : <XCircle size={80} />}
+            <h2>{roomError ? 'Battle unavailable' : winner === user.name ? 'Victory!' : `${winner} Won!`}</h2>
+            <p>{roomError ? roomError : 'The battle has ended. Your rating has been updated.'}</p>
             <button className="btn" onClick={() => navigate('/')}>Return to Lobby</button>
           </div>
         </div>

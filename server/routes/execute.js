@@ -187,6 +187,13 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
+    if (!data.run) {
+      return res.json({
+        success: false,
+        error: "Execution Error: Missing run output from compilation engine.\nRaw Response: " + JSON.stringify(data)
+      });
+    }
+
     // Try to parse stdout as JSON (an array of arrays representing the 3 outputs)
     let userOutputs;
     try {

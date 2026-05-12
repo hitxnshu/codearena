@@ -63,31 +63,72 @@ const Home = () => {
     <div className="home-page">
       <Navbar onAction={handleCreateBattle} />
 
+      <div className="hero-background" style={{ position: 'fixed', zIndex: -1, pointerEvents: 'none' }}>
+        <div className="orb orb-1" style={{ top: '10%' }} />
+        <div className="orb orb-2" style={{ bottom: '15%' }} />
+      </div>
+
       <main className="home-main">
-        <section className="hero-panel glass">
-          <div className="hero-copy">
-            <span className="eyebrow">Play It The Way You Want</span>
-            <h1>Play, create and own your own gaming team anywhere, anytime.</h1>
-            <p>Jump into fast-paced coding battles, build your squad, and compete with challengers on a sleek pro platform.</p>
+        <section className="hero-container" style={{ margin: '2rem auto 4rem', maxWidth: '1200px' }}>
+          <div className="hero-content">
+            <div className="hero-brand" style={{ background: 'rgba(34, 197, 94, 0.1)', borderColor: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }}>
+              <Trophy size={18} className="brand-icon" />
+              <span>Welcome Back, {user.name}</span>
+            </div>
+            
+            <h1 className="hero-title" style={{ fontSize: '3.5rem' }}>
+              Ready for your next<br/>
+              <span className="highlight-gradient">Coding Battle?</span>
+            </h1>
+            
+            <p className="hero-subtitle">
+              Jump into fast-paced coding battles, solve algorithmic challenges, and climb the global leaderboard.
+            </p>
+            
             <div className="hero-actions">
-              <button className="btn hero-btn" onClick={handleCreateBattle} disabled={creating}>
-                {creating ? <Loader2 size={16} className="spin" /> : 'Go to Gaming World'}
+              <button className="btn cta-primary" onClick={handleCreateBattle} disabled={creating} style={{ padding: '0.8rem 1.5rem', gap: '0.5rem' }}>
+                {creating ? <Loader2 size={20} className="spin" /> : <Swords size={20} />}
+                Create Match
               </button>
-              <button className="text-btn" type="button" onClick={() => document.getElementById('battles-section')?.scrollIntoView({ behavior: 'smooth' })}>
-                Explore Teams
+              <button className="btn cta-secondary" onClick={() => document.getElementById('battles-section')?.scrollIntoView({ behavior: 'smooth' })} style={{ padding: '0.8rem 1.5rem' }}>
+                Explore Open Battles
               </button>
             </div>
           </div>
 
           <div className="hero-visual">
-            <div className="hero-visual-card glass">
-              <div className="hero-visual-glow" />
-              <div className="hero-visual-graphic">
-                <div className="hero-visual-top" />
-                <div className="hero-visual-screen">
-                  <div className="screen-line" />
-                  <div className="screen-line short" />
-                  <div className="screen-chip" />
+            <div className="battle-preview-card glass" style={{ width: '100%', maxWidth: '400px', margin: '0 auto' }}>
+              <div className="preview-header">
+                <div className="live-badge" style={{ color: '#60a5fa' }}>
+                  <span className="live-dot" style={{ background: '#60a5fa' }}></span> STATS
+                </div>
+                <div className="timer-display">{user.rating || 1200} ELO</div>
+              </div>
+
+              <div className="preview-problem">
+                <span className="difficulty" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: '600' }}>Current Rank</span>
+                <span className="problem-name">Silver I</span>
+              </div>
+
+              <div className="preview-competitors" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'flex-start', marginBottom: '0' }}>
+                <div style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span className="comp-name" style={{ color: 'var(--text-muted)' }}>Win Rate</span>
+                    <span className="comp-score">
+                      {user.stats?.totalBattles ? Math.round((user.stats?.wins / user.stats?.totalBattles) * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="comp-bar-bg"><div className="comp-bar-fill fill-1" style={{ width: `${user.stats?.totalBattles ? Math.round((user.stats?.wins / user.stats?.totalBattles) * 100) : 0}%` }}></div></div>
+                </div>
+                <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Total Battles</span>
+                    <span style={{ fontWeight: '700', fontSize: '1.25rem' }}>{user.stats?.totalBattles || 0}</span>
+                  </div>
+                  <div>
+                    <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Wins</span>
+                    <span style={{ fontWeight: '700', fontSize: '1.25rem', color: '#4ade80' }}>{user.stats?.wins || 0}</span>
+                  </div>
                 </div>
               </div>
             </div>
