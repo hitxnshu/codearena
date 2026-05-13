@@ -67,8 +67,14 @@ function initializeSocket(server) {
           return;
         }
 
+        const userId = user?.id || user?._id;
+        if (!userId) {
+          socket.emit('roomError', { message: 'Invalid user session.' });
+          return;
+        }
+
         const participantIds = battle.players.map((playerId) => playerId.toString());
-        const isParticipant = user?.id && participantIds.includes(user.id);
+        const isParticipant = participantIds.includes(userId.toString());
 
         if (!isParticipant) {
           socket.emit('roomError', { message: 'You are not part of this battle room.' });
@@ -89,7 +95,7 @@ function initializeSocket(server) {
 
         console.log(`${user.name} joined room ${battleId} (${sockets.size} connected)`);
 
-        socket.to(battleId).emit('playerJoined', user);
+        socket.to(battleId).emit('playerJoined', { ...user, id: userId });
       } catch (err) {
         console.error('joinRoom error:', err);
         socket.emit('roomError', { message: 'Unable to join battle room.' });

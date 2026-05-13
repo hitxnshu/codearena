@@ -45,6 +45,8 @@ const Battle = () => {
     let isMounted = true;
     let newSocket = null;
 
+    const userId = user?.id || user?._id;
+
     const fetchBattle = async () => {
       try {
         const res = await axios.get(`http://localhost:5000/api/battles/${battleId}`);
@@ -52,7 +54,7 @@ const Battle = () => {
 
         const isParticipant = res.data.players.some((player) => {
           const playerId = player._id || player.id || player;
-          return playerId.toString() === user.id;
+          return playerId.toString() === userId;
         });
 
         if (!isParticipant) {
@@ -71,7 +73,7 @@ const Battle = () => {
           setBattleStatus('active');
           const opponentData = res.data.players.find((player) => {
             const playerId = player._id || player.id || player;
-            return playerId.toString() !== user.id;
+            return playerId.toString() !== userId;
           });
           if (opponentData) {
             setOpponent(opponentData);
@@ -82,14 +84,15 @@ const Battle = () => {
         setSocket(newSocket);
 
         newSocket.on('connect', () => {
-          newSocket.emit('joinRoom', { battleId, user });
+          newSocket.emit('joinRoom', { battleId, user: { ...user, id: userId } });
         });
 
         newSocket.on('playerJoined', (joinedUser) => {
-          if (joinedUser.id !== user.id) {
+          const joinedUserId = joinedUser.id || joinedUser._id;
+          if (joinedUserId !== userId) {
             setOpponent(joinedUser);
             setBattleStatus('active');
-            newSocket.emit('startBattle', { battleId, user });
+            newSocket.emit('startBattle', { battleId, user: { ...user, id: userId } });
           }
         });
 
