@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const Battle = require('../models/Battle');
+const { broadcastOpenBattlesChanged } = require('../socket');
 
 // @route   POST api/battles/create
 // @desc    Create a new battle room
@@ -9,10 +10,12 @@ const Battle = require('../models/Battle');
 router.post('/create', auth, async (req, res) => {
   try {
     const newBattle = new Battle({
-      players: [req.user.id] // The creator is the first player
+      host: req.user.id,
+      players: [req.user.id]
     });
 
     const battle = await newBattle.save();
+    broadcastOpenBattlesChanged();
     res.json(battle);
   } catch (err) {
     console.error(err.message);
@@ -50,6 +53,9 @@ router.post('/join/:id', auth, async (req, res) => {
     }
 
     await battle.save();
+    if (battle.status !== 'waiting') {
+      broadcastOpenBattlesChanged();
+    }
     res.json(battle);
   } catch (err) {
     console.error(err.message);
@@ -65,7 +71,7 @@ router.post('/join/:id', auth, async (req, res) => {
 // @access  Private
 router.get('/open', auth, async (req, res) => {
   try {
-    const battles = await Battle.find({ status: 'waiting' })
+    const battles = await Battle.find({ status: 'waiting', players: { $ne: [] } })
       .populate('players', 'name rating')
       .sort({ createdAt: -1 });
       

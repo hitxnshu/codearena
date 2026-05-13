@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const battleSchema = new mongoose.Schema({
+  host: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   players: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -8,7 +13,7 @@ const battleSchema = new mongoose.Schema({
   problemId: {
     type: String,
     // For now, this is just a string placeholder. We will link this to actual problems later.
-    default: 'simple-two-sum' 
+    default: 'simple-two-sum'
   },
   status: {
     type: String,

@@ -43,20 +43,84 @@ const Battle = () => {
     }
 
     let isMounted = true;
-    const newSocket = io('http://localhost:5000');
-    setSocket(newSocket);
+    let newSocket = null;
 
     const fetchBattle = async () => {
       try {
         const res = await axios.get(`http://localhost:5000/api/battles/${battleId}`);
         if (!isMounted) return;
+
+        const isParticipant = res.data.players.some((player) => {
+          const playerId = player._id || player.id || player;
+          return playerId.toString() === user.id;
+        });
+
+        if (!isParticipant) {
+          setRoomError('You must join from the lobby first.');
+          setLoading(false);
+          setTimeout(() => navigate('/'), 2000);
+          return;
+        }
+
         if (res.data.status === 'finished') {
           navigate('/');
           return;
         }
+
+        if (res.data.status === 'active') {
+          setBattleStatus('active');
+          const opponentData = res.data.players.find((player) => {
+            const playerId = player._id || player.id || player;
+            return playerId.toString() !== user.id;
+          });
+          if (opponentData) {
+            setOpponent(opponentData);
+          }
+        }
+
+        newSocket = io('http://localhost:5000');
+        setSocket(newSocket);
+
+        newSocket.on('connect', () => {
+          newSocket.emit('joinRoom', { battleId, user });
+        });
+
+        newSocket.on('playerJoined', (joinedUser) => {
+          if (joinedUser.id !== user.id) {
+            setOpponent(joinedUser);
+            setBattleStatus('active');
+            newSocket.emit('startBattle', { battleId, user });
+          }
+        });
+
+        newSocket.on('battleStarted', () => {
+          setBattleStatus('active');
+        });
+
+        newSocket.on('battleEnded', ({ winnerName }) => {
+          setBattleStatus('finished');
+          setWinner(winnerName);
+          if (winnerName === user.name) {
+            triggerConfetti();
+          }
+        });
+
+        newSocket.on('opponentLeft', () => {
+          setRoomError('Opponent disconnected. Returning to lobby...');
+          setBattleStatus('finished');
+          setTimeout(() => navigate('/'), 2500);
+        });
+
+        newSocket.on('roomError', ({ message }) => {
+          setRoomError(message || 'Battle is unavailable. Redirecting...');
+          setBattleStatus('finished');
+          setTimeout(() => navigate('/'), 2500);
+        });
       } catch (err) {
         if (!isMounted) return;
-        navigate('/');
+        setRoomError('This battle room could not be found. Returning to lobby...');
+        setBattleStatus('finished');
+        setTimeout(() => navigate('/'), 2500);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -64,45 +128,9 @@ const Battle = () => {
 
     fetchBattle();
 
-    newSocket.on('connect', () => {
-      newSocket.emit('joinRoom', { battleId, user });
-    });
-
-    newSocket.on('playerJoined', (joinedUser) => {
-      if (joinedUser.id !== user.id) {
-        setOpponent(joinedUser);
-        setBattleStatus('active');
-        newSocket.emit('startBattle', { battleId });
-      }
-    });
-
-    newSocket.on('battleStarted', () => {
-      setBattleStatus('active');
-    });
-
-    newSocket.on('battleEnded', ({ winnerName }) => {
-      setBattleStatus('finished');
-      setWinner(winnerName);
-      if (winnerName === user.name) {
-        triggerConfetti();
-      }
-    });
-
-    newSocket.on('opponentLeft', () => {
-      setRoomError('Opponent disconnected. Returning to lobby...');
-      setBattleStatus('finished');
-      setTimeout(() => navigate('/'), 2500);
-    });
-
-    newSocket.on('roomError', ({ message }) => {
-      setRoomError(message || 'Battle is unavailable. Redirecting...');
-      setBattleStatus('finished');
-      setTimeout(() => navigate('/'), 2500);
-    });
-
     return () => {
       isMounted = false;
-      if (newSocket.connected) {
+      if (newSocket && newSocket.connected) {
         newSocket.emit('leaveRoom', { battleId, user });
         newSocket.disconnect();
       }
@@ -140,7 +168,7 @@ const Battle = () => {
   const handleEditorChange = (value) => {
     setCode(value);
     if (socket) {
-      socket.emit('codeUpdate', { battleId, code: value });
+      socket.emit('codeUpdate', { battleId, code: value, user });
     }
   };
 

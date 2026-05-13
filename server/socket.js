@@ -1,6 +1,14 @@
 const { Server } = require('socket.io');
 const Battle = require('./models/Battle');
 
+let ioInstance = null;
+
+function broadcastOpenBattlesChanged() {
+  if (ioInstance) {
+    ioInstance.emit('openBattlesChanged');
+  }
+}
+
 function initializeSocket(server) {
   const io = new Server(server, {
     cors: {
@@ -9,6 +17,7 @@ function initializeSocket(server) {
     }
   });
 
+  ioInstance = io;
   const roomSockets = new Map();
   const socketRoom = new Map();
 
@@ -18,6 +27,7 @@ function initializeSocket(server) {
       if (!battle) return;
       await Battle.findByIdAndDelete(battleId);
       console.log(`Cleaned up stale battle record ${battleId}`);
+      broadcastOpenBattlesChanged();
     } catch (err) {
       console.error('cleanupBattleRecord error:', err);
     }
@@ -52,8 +62,21 @@ function initializeSocket(server) {
     socket.on('joinRoom', async ({ battleId, user }) => {
       try {
         const battle = await Battle.findById(battleId);
-        if (!battle || battle.status === 'finished') {
-          socket.emit('roomError', { message: 'This battle is no longer available.' });
+        if (!battle) {
+          socket.emit('roomError', { message: 'This battle is not available.' });
+          return;
+        }
+
+        const participantIds = battle.players.map((playerId) => playerId.toString());
+        const isParticipant = user?.id && participantIds.includes(user.id);
+
+        if (!isParticipant) {
+          socket.emit('roomError', { message: 'You are not part of this battle room.' });
+          return;
+        }
+
+        if (battle.status === 'finished') {
+          socket.emit('roomError', { message: 'This battle has already finished.' });
           return;
         }
 
@@ -73,26 +96,53 @@ function initializeSocket(server) {
       }
     });
 
-    socket.on('leaveRoom', async ({ battleId }) => {
+    socket.on('leaveRoom', async () => {
       await removeSocketFromRoom(socket, true);
     });
 
-    socket.on('codeUpdate', ({ battleId, code }) => {
-      socket.to(battleId).emit('codeUpdate', code);
+    socket.on('codeUpdate', async ({ battleId, code, user }) => {
+      try {
+        const battle = await Battle.findById(battleId);
+        if (!battle) return;
+
+        const participantIds = battle.players.map((playerId) => playerId.toString());
+        if (!user?.id || !participantIds.includes(user.id)) return;
+
+        socket.to(battleId).emit('codeUpdate', code);
+      } catch (err) {
+        console.error('codeUpdate validation error:', err);
+      }
     });
 
-    socket.on('startBattle', ({ battleId }) => {
-      io.to(battleId).emit('battleStarted');
+    socket.on('startBattle', async ({ battleId, user }) => {
+      try {
+        const battle = await Battle.findById(battleId);
+        if (!battle) return;
+
+        const participantIds = battle.players.map((playerId) => playerId.toString());
+        if (!user?.id || !participantIds.includes(user.id)) return;
+
+        io.to(battleId).emit('battleStarted');
+      } catch (err) {
+        console.error('startBattle validation error:', err);
+      }
     });
 
     socket.on('submitCode', async ({ battleId, user }) => {
-      io.to(battleId).emit('battleEnded', { winnerName: user.name });
       try {
         const battle = await Battle.findById(battleId);
-        if (battle) {
+        if (!battle) return;
+
+        const participantIds = battle.players.map((playerId) => playerId.toString());
+        if (!user?.id || !participantIds.includes(user.id)) return;
+
+        io.to(battleId).emit('battleEnded', { winnerName: user.name });
+
+        if (battle.status !== 'finished') {
           battle.status = 'finished';
           battle.winner = user.id;
           await battle.save();
+          broadcastOpenBattlesChanged();
 
           setTimeout(async () => {
             await cleanupBattleRecord(battleId);
@@ -113,3 +163,4 @@ function initializeSocket(server) {
 }
 
 module.exports = initializeSocket;
+module.exports.broadcastOpenBattlesChanged = broadcastOpenBattlesChanged;

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Swords, Trophy, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 import Navbar from '../components/Navbar';
 
 
@@ -16,13 +17,21 @@ const Home = () => {
   useEffect(() => {
     fetchOpenBattles();
     const interval = setInterval(fetchOpenBattles, 5000);
-    return () => clearInterval(interval);
+
+    const homeSocket = io('http://localhost:5000');
+    homeSocket.on('openBattlesChanged', fetchOpenBattles);
+
+    return () => {
+      clearInterval(interval);
+      homeSocket.disconnect();
+    };
   }, []);
 
   const fetchOpenBattles = async () => {
     try {
       const res = await axios.get('http://localhost:5000/api/battles/open');
-      setOpenBattles(res.data);
+      const filtered = res.data.filter((battle) => Array.isArray(battle.players) && battle.players.length > 0);
+      setOpenBattles(filtered);
     } catch (err) {
       console.error('Error fetching battles:', err);
     } finally {
